@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雞兔同籠：小老師挑戰賽</title>
+    <style>
+        body { font-family: "Microsoft JhengHei", sans-serif; background-color: #fcfaf2; text-align: center; padding: 20px; }
+        .container { max-width: 850px; margin: auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #eee; }
+        
+        /* 積分板樣式 */
+        .score-board { display: inline-block; background: #2c3e50; color: #f1c40f; padding: 10px 25px; border-radius: 50px; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        
+        .mission-box { background: #e3f2fd; border-left: 6px solid #2196f3; padding: 20px; border-radius: 10px; font-size: 1.4rem; margin-bottom: 25px; color: #0d47a1; }
+        .target-val { color: #e67e22; font-weight: bold; text-decoration: underline; }
+        
+        .status-bar { display: flex; justify-content: space-around; background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #e0e0e0; }
+        .val-box { font-size: 1.1rem; }
+        .num { font-weight: bold; font-size: 1.3rem; }
+        
+        .cage { min-height: 280px; border: 5px solid #8d6e63; border-radius: 20px; background-color: #fff; padding: 20px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 10px; margin-bottom: 20px; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); }
+        .animal { font-size: 3.5rem; cursor: pointer; user-select: none; transition: 0.2s; position: relative; }
+        .animal:hover { transform: scale(1.1); filter: drop-shadow(0 0 5px rgba(231, 76, 60, 0.5)); }
+        
+        .controls { display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        button { padding: 12px 25px; font-size: 1.1rem; cursor: pointer; border-radius: 12px; border: none; font-weight: bold; transition: 0.3s; box-shadow: 0 4px 0 rgba(0,0,0,0.1); }
+        .btn-chicken { background: #ffeb3b; color: #5d4037; }
+        .btn-rabbit { background: #ff9800; color: white; }
+        .btn-next { background: #4caf50; color: white; display: none; } /* 答對才出現 */
+        .btn-reset { background: #9e9e9e; color: white; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 0 rgba(0,0,0,0.1); }
+        button:active { transform: translateY(2px); box-shadow: 0 0 0 rgba(0,0,0,0.1); }
+
+        .error { color: #e74c3c; }
+        .success-text { color: #2e7d32; font-size: 1.6rem; font-weight: bold; margin-top: 10px; animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="score-board">🏆 目前答對題數：<span id="score">0</span></div>
+    
+    <h1>🐤 雞兔同籠：互動教室 🐰</h1>
+    
+    <div class="mission-box" id="missionText">正在出題中...</div>
+
+    <div class="status-bar">
+        <div class="val-box">籠內總隻數：<span id="curAnimals" class="num">0</span></div>
+        <div class="val-box">籠內總腳數：<span id="curLegs" class="num">0</span></div>
+    </div>
+
+    <div class="controls">
+        <button class="btn-chicken" id="btnAddChicken" onclick="addAnimal('chicken')">＋ 放入雞 (2腳)</button>
+        <button class="btn-rabbit" id="btnAddRabbit" onclick="addAnimal('rabbit')">＋ 放入兔 (4腳)</button>
+        <button class="btn-reset" onclick="clearCage()">清空籠子</button>
+        <button class="btn-next" id="btnNext" onclick="initGame()">挑戰下一題！</button>
+    </div>
+
+    <div class="cage" id="cage" title="點擊動物可以將其趕出籠子"></div>
+
+    <div id="feedback"></div>
+</div>
+
+<script>
+    let targetLegs = 0;
+    let targetAnimals = 0;
+    let chickens = 0;
+    let rabbits = 0;
+    let solvedCount = 0;
+    let isCurrentSolved = false;
+
+    function initGame() {
+        // 重置狀態
+        isCurrentSolved = false;
+        chickens = 0;
+        rabbits = 0;
+        document.getElementById('btnNext').style.display = 'none';
+        document.getElementById('btnAddChicken').disabled = false;
+        document.getElementById('btnAddRabbit').disabled = false;
+        document.getElementById('cage').innerHTML = '';
+        
+        // 生成有意義的題目 (腳數 10~60 之間)
+        let r = Math.floor(Math.random() * 8) + 1; // 1~8 兔
+        let c = Math.floor(Math.random() * 12) + 1; // 1~12 雞
+        targetAnimals = r + c;
+        targetLegs = (r * 4) + (c * 2);
+
+        // 邊界檢查
+        if (targetLegs > 60 || targetLegs < 10) {
+            initGame();
+            return;
+        }
+
+        document.getElementById('missionText').innerHTML = 
+            `題目：籠子裡共有 <span class="target-val">${targetAnimals}</span> 隻動物，<br>` +
+            `數一數共有 <span class="target-val">${targetLegs}</span> 隻腳。請調整雞兔數量！`;
+        
+        updateUI();
+    }
+
+    function addAnimal(type) {
+        if (isCurrentSolved) return;
+        if (type === 'chicken') { chickens++; render('🐥', 'chicken'); }
+        else { rabbits++; render('🐰', 'rabbit'); }
+        updateUI();
+    }
+
+    function render(emoji, type) {
+        const span = document.createElement('span');
+        span.className = 'animal';
+        span.innerText = emoji;
+        span.onclick = () => {
+            if (isCurrentSolved) return;
+            if (type === 'chicken') chickens--; else rabbits--;
+            span.remove();
+            updateUI();
+        };
+        document.getElementById('cage').appendChild(span);
+    }
+
+    function updateUI() {
+        const curL = (chickens * 2) + (rabbits * 4);
+        const curA = chickens + rabbits;
+        
+        document.getElementById('curAnimals').innerText = curA;
+        document.getElementById('curLegs').innerText = curL;
+        
+        // 數值超過提示
+        document.getElementById('curAnimals').className = (curA > targetAnimals) ? 'num error' : 'num';
+        document.getElementById('curLegs').className = (curL > targetLegs) ? 'num error' : 'num';
+
+        const fb = document.getElementById('feedback');
+        
+        if (curA === targetAnimals && curL === targetLegs) {
+            if (chickens > 0 && rabbits > 0) {
+                fb.innerHTML = "<div class='success-text'>✨ 太棒了！你答對了！ ✨</div>";
+                if (!isCurrentSolved) {
+                    solvedCount++;
+                    document.getElementById('score').innerText = solvedCount;
+                    isCurrentSolved = true;
+                    // 顯示下一題按鈕，暫停編輯
+                    document.getElementById('btnNext').style.display = 'inline-block';
+                    document.getElementById('btnAddChicken').disabled = true;
+                    document.getElementById('btnAddRabbit').disabled = true;
+                }
+            } else {
+                fb.innerHTML = "<div class='error'>腳數跟頭數都對了，但籠子裡必須「同時」有雞和兔喔！</div>";
+            }
+        } else {
+            fb.innerHTML = "";
+        }
+    }
+
+    function clearCage() {
+        if (isCurrentSolved) return;
+        chickens = 0; rabbits = 0;
+        document.getElementById('cage').innerHTML = '';
+        updateUI();
+    }
+
+    initGame();
+</script>
+
+</body>
+</html>
